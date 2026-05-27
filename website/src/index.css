@@ -1,0 +1,824 @@
+:root {
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #162033;
+  background: #f5f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --panel-subtle: #f8fafc;
+  --line: #d9e0ea;
+  --line-strong: #b9c5d6;
+  --text: #162033;
+  --muted: #6d788a;
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: #e7efff;
+  --green: #14804a;
+  --amber: #b45309;
+  --danger: #c2410c;
+  --shadow: 0 18px 50px rgba(28, 38, 64, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 40px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.topbar.compact {
+  align-items: center;
+}
+
+.topbar h1 {
+  margin: 2px 0 0;
+  font-size: 32px;
+  line-height: 1.18;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.topbarActions,
+.toolbarActions,
+.formActions,
+.resultActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.button,
+.iconButton {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-weight: 750;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.button:hover,
+.iconButton:hover,
+.deckOpenButton:hover,
+.uploadBox:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.button.primary:hover {
+  background: var(--primary-strong);
+}
+
+.button.ghost {
+  background: #fff;
+}
+
+.button.full {
+  width: 100%;
+}
+
+.dangerText {
+  color: var(--danger);
+}
+
+.iconButton {
+  width: 42px;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.iconButton.small {
+  width: 34px;
+  min-height: 34px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.panelHeader h2,
+.settingsPanel h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.panelHeader p,
+.deckTitleBlock p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.importPanel {
+  min-height: 248px;
+}
+
+.uploadBox {
+  width: 100%;
+  min-height: 126px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.uploadBox small {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.inlineHint {
+  margin-top: 14px;
+  color: var(--amber);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statsPanel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  box-shadow: none;
+}
+
+.stat {
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.stat.wide {
+  grid-column: 1 / -1;
+}
+
+.stat span {
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.stat small,
+.deckCard small {
+  color: var(--muted);
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.deckCard {
+  position: relative;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  padding-right: 146px;
+  text-align: left;
+  min-height: 92px;
+}
+
+.deckCard.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.deckOpenButton {
+  width: 100%;
+  min-height: 58px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  text-align: left;
+}
+
+.deckOpenButton:hover {
+  transform: none;
+}
+
+.deckOpenButton span {
+  font-weight: 850;
+}
+
+.deckRenameForm {
+  display: grid;
+  gap: 8px;
+  min-height: 58px;
+}
+
+.deckRenameForm input {
+  width: 100%;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 850;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.deckRenameForm input:focus {
+  outline: 3px solid var(--primary-soft);
+}
+
+.deckRenameForm small {
+  color: var(--muted);
+}
+
+.deckIconActions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+}
+
+.exportMenu {
+  position: absolute;
+  top: 42px;
+  right: 40px;
+  z-index: 10;
+  width: 132px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.exportMenu button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 0 10px;
+  font-weight: 750;
+}
+
+.exportMenu button:hover {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.dangerIcon {
+  color: var(--danger);
+}
+
+.emptyState,
+.tableEmpty {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.emptyState strong {
+  color: var(--text);
+}
+
+.deckTitleBlock {
+  flex: 1;
+}
+
+.deckTitleInput {
+  width: min(520px, 100%);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 850;
+  padding: 4px 0;
+}
+
+.deckTitleInput:focus {
+  outline: 0;
+  border-color: var(--primary);
+}
+
+.manageGrid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.settingsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 10px;
+  font-weight: 750;
+}
+
+input[type="range"] {
+  accent-color: var(--primary);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented button {
+  min-height: 40px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button.active {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.compactSegments {
+  width: min(420px, 100%);
+}
+
+.editorPanel {
+  position: relative;
+}
+
+.sentenceForm {
+  display: grid;
+  gap: 12px;
+}
+
+.translateControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+  color: var(--primary-strong);
+  padding: 12px;
+  font-weight: 800;
+}
+
+.translateControls span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.sentenceForm textarea {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: #fff;
+}
+
+.sentenceForm textarea:focus,
+.searchBox input:focus,
+.promptLine input:focus {
+  outline: 3px solid var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.tablePanel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tableToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.searchBox {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--muted);
+}
+
+.searchBox input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+}
+
+.sentenceTableWrap {
+  overflow-x: auto;
+}
+
+.sentenceTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.sentenceTable th,
+.sentenceTable td {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.sentenceTable th {
+  background: var(--panel-subtle);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sentenceTable th:first-child,
+.sentenceTable td:first-child,
+.sentenceTable th:last-child,
+.sentenceTable td:last-child {
+  width: 76px;
+  text-align: center;
+}
+
+.studyShell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(1000px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.studyHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progressBlock {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.progressTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: #dfe6f1;
+  overflow: hidden;
+}
+
+.progressTrack div {
+  height: 100%;
+  background: var(--primary);
+}
+
+.difficultyBadge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #fff;
+  font-weight: 850;
+}
+
+.studyCard {
+  align-self: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: clamp(22px, 4vw, 42px);
+}
+
+.translation {
+  margin: 0 0 34px;
+  font-size: clamp(25px, 4vw, 42px);
+  line-height: 1.35;
+  font-weight: 850;
+  text-align: center;
+}
+
+.promptLine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 24px;
+  line-height: 1.7;
+}
+
+.promptLine input {
+  width: 156px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  min-height: 46px;
+  padding: 6px 10px;
+  background: #fffdf0;
+  text-align: center;
+  font-weight: 800;
+}
+
+.submitButton {
+  margin-left: 8px;
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.answerPanel {
+  margin-top: 28px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.answerPanel div {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.resultShell {
+  display: grid;
+  gap: 18px;
+}
+
+.resultHero {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 34px;
+  text-align: center;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.resultHero p,
+.resultHero h1 {
+  margin: 0;
+}
+
+.resultHero h1 {
+  font-size: 60px;
+}
+
+.wrongList {
+  display: grid;
+  gap: 10px;
+}
+
+.wrongItem {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.wrongItem small {
+  color: var(--danger);
+}
+
+.toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 20;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+}
+
+.toast.success {
+  background: var(--green);
+}
+
+.toast.error {
+  background: var(--danger);
+}
+
+.busyOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(245, 247, 251, 0.7);
+  display: grid;
+  place-items: center;
+  color: var(--primary-strong);
+  font-weight: 850;
+  gap: 8px;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 820px) {
+  .shell,
+  .studyShell {
+    width: min(100% - 20px, 1180px);
+    padding-top: 14px;
+  }
+
+  .topbar,
+  .dashboardGrid,
+  .manageGrid,
+  .tableToolbar {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar h1 {
+    font-size: 26px;
+  }
+
+  .topbarActions,
+  .toolbarActions,
+  .formActions,
+  .resultActions {
+    width: 100%;
+  }
+
+  .topbarActions .button,
+  .toolbarActions .button,
+  .formActions .button,
+  .resultActions .button {
+    flex: 1;
+  }
+
+  .deckTitleInput {
+    font-size: 22px;
+  }
+
+  .deckCard {
+    padding-right: 16px;
+    padding-bottom: 62px;
+  }
+
+  .deckIconActions {
+    top: auto;
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .exportMenu {
+    top: auto;
+    right: 40px;
+    bottom: 42px;
+  }
+
+  .studyHeader {
+    align-items: flex-start;
+  }
+
+  .difficultyBadge {
+    display: none;
+  }
+
+  .promptLine {
+    font-size: 20px;
+    justify-content: flex-start;
+  }
+
+  .promptLine input {
+    width: 132px;
+  }
+
+  .submitButton {
+    width: 100%;
+    margin-left: 0;
+  }
+}
