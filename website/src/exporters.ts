@@ -1,7 +1,7 @@
 import initSqlJs from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as XLSX from "xlsx";
-import type { Deck, Sentence } from "./types";
+import type { Deck, ReviewState, Sentence, StudyRecord } from "./types";
 import { downloadBlob, downloadJson } from "./utils";
 
 export type ExportFormat = "json" | "xlsx" | "csv" | "db";
@@ -18,15 +18,22 @@ function exportBaseName(deck: Deck) {
   return `${deck.name}-sentence-anki`;
 }
 
-export async function exportDeckFile(deck: Deck, sentences: Sentence[], format: ExportFormat) {
+export async function exportDeckFile(
+  deck: Deck,
+  sentences: Sentence[],
+  format: ExportFormat,
+  options: { includeHistory?: boolean; studyRecords?: StudyRecord[]; reviewStates?: ReviewState[] } = {},
+) {
   const baseName = exportBaseName(deck);
 
   if (format === "json") {
     downloadJson(`${baseName}.json`, {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       decks: [deck],
       sentences,
+      studyRecords: options.includeHistory ? (options.studyRecords ?? []) : [],
+      reviewStates: options.includeHistory ? (options.reviewStates ?? []) : [],
     });
     return;
   }

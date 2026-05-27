@@ -1,0 +1,17 @@
+{
+  "name": "SentenceAnki",
+  "short_name": "SentenceAnki",
+  "description": "문장 빈칸 암기와 SRS 복습을 위한 로컬 우선 학습 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

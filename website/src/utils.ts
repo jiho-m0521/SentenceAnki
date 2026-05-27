@@ -16,6 +16,13 @@ export function formatDateTime(value?: string) {
   }).format(new Date(value));
 }
 
+export function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms <= 0) return "0초";
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.round(ms / 100) / 10;
+  return `${seconds}초`;
+}
+
 export function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
