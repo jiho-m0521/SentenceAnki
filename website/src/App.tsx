@@ -748,7 +748,7 @@ function App() {
         <section className="topbar">
           <div>
             <p className="eyebrow">SentenceAnki Web</p>
-            <h1>오늘 할 학습을 한 화면에서 끝내세요</h1>
+            <h1>오늘의 문장 학습을 시작해 보세요</h1>
           </div>
           <div className="topbarActions">
             <button className="button ghost" onClick={openLanding}>
