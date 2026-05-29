@@ -20,7 +20,6 @@ import {
   Languages,
   List,
   Loader2,
-  Mail,
   Pencil,
   Play,
   Plus,
@@ -80,6 +79,11 @@ type View = "landing" | "dashboard" | "manage" | "study" | "result" | "settings"
 type Notice = { type: "success" | "error"; message: string } | null;
 type SentenceView = "table" | "cards";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 const blankModeLabels: Record<BlankMode, string> = {
   random: "랜덤",
   important: "핵심 단어",
@@ -95,7 +99,7 @@ function App() {
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const [reviews, setReviews] = useState<ReviewState[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [view, setView] = useState<View>("landing");
+  const [view, setView] = useState<View>(() => (window.location.pathname.startsWith("/app") ? "dashboard" : "landing"));
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -122,6 +126,7 @@ function App() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationStatus, setTranslationStatus] = useState("");
   const [autoKoreanDirty, setAutoKoreanDirty] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const blankRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -159,6 +164,28 @@ function App() {
 
   useEffect(() => {
     void refreshAll();
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setView(window.location.pathname.startsWith("/app") ? "dashboard" : "landing");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleInstalled = () => setInstallPrompt(null);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -532,8 +559,32 @@ function App() {
   }
 
   function openApp() {
+    if (window.location.pathname !== "/app") {
+      window.history.pushState({}, "", "/app");
+    }
     setView("dashboard");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openLanding() {
+    if (window.location.pathname !== "/") {
+      window.history.pushState({}, "", "/");
+    }
+    setView("landing");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function installApp() {
+    if (!installPrompt) {
+      showNotice("error", "브라우저가 아직 앱 설치를 제공하지 않습니다. 주소창의 설치 아이콘이나 브라우저 메뉴를 확인하세요.");
+      return;
+    }
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === "accepted") {
+      setInstallPrompt(null);
+      showNotice("success", "앱 설치를 시작했습니다.");
+    }
   }
 
   function renderLanding() {
@@ -568,7 +619,7 @@ function App() {
           </div>
           <nav className="landingNav">
             <button onClick={openApp}>앱 열기</button>
-            <a href="mailto:jiho@mjiho.com">문의</a>
+            <button onClick={() => void installApp()}>다운로드</button>
           </nav>
           <div className="landingHeroContent">
             <p className="eyebrow">SentenceAnki</p>
@@ -581,9 +632,9 @@ function App() {
               <button className="button primary" onClick={openApp}>
                 <Play size={18} /> 바로 시작하기
               </button>
-              <a className="button ghost" href="mailto:jiho@mjiho.com">
-                <Mail size={18} /> jiho@mjiho.com
-              </a>
+              <button className="button ghost" onClick={() => void installApp()}>
+                <Download size={18} /> 앱 설치하기
+              </button>
             </div>
           </div>
         </section>
@@ -700,7 +751,7 @@ function App() {
             <h1>오늘 할 학습을 한 화면에서 끝내세요</h1>
           </div>
           <div className="topbarActions">
-            <button className="button ghost" onClick={() => setView("landing")}>
+            <button className="button ghost" onClick={openLanding}>
               <Home size={18} /> 소개
             </button>
             <button className="button ghost" onClick={() => setView("settings")}>

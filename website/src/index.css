@@ -55,24 +55,28 @@ button:disabled {
 .landingHero {
   position: relative;
   min-height: 92vh;
-  overflow: hidden;
+  overflow: clip;
   display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(460px, 0.74fr);
+  gap: clamp(32px, 5vw, 84px);
   align-items: center;
   padding: 96px max(24px, calc((100vw - 1180px) / 2)) 72px;
   background: #edf3f8;
 }
 
 .heroStudyScene {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  z-index: 0;
+  grid-column: 2;
+  grid-row: 1;
   display: grid;
-  place-items: center end;
-  padding-right: max(16px, calc((100vw - 1180px) / 2));
+  place-items: center;
   opacity: 0.95;
+  min-width: 0;
 }
 
 .sceneWindow {
-  width: min(620px, 52vw);
+  width: min(620px, 100%);
   min-height: 430px;
   border: 1px solid rgba(143, 160, 180, 0.45);
   border-radius: 24px;
@@ -203,12 +207,15 @@ button:disabled {
 .landingHeroContent {
   position: relative;
   z-index: 1;
-  width: min(620px, 100%);
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .landingHeroContent h1 {
   margin: 10px 0 18px;
-  font-size: clamp(42px, 7vw, 84px);
+  font-size: clamp(42px, 5.4vw, 76px);
   line-height: 0.98;
   letter-spacing: 0;
 }
@@ -1482,11 +1489,14 @@ input[type="range"] {
   .landingHero {
     min-height: auto;
     padding: 92px 16px 42px;
+    grid-template-columns: 1fr;
   }
 
   .heroStudyScene {
     position: relative;
     inset: auto;
+    grid-column: auto;
+    grid-row: auto;
     padding: 0;
     margin: 24px 0 0;
     place-items: stretch;
@@ -1505,6 +1515,8 @@ input[type="range"] {
   }
 
   .landingHeroContent {
+    grid-column: auto;
+    grid-row: auto;
     width: 100%;
   }
 
