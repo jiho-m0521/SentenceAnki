@@ -1,7 +1,9 @@
-/* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/exhaustive-deps */
 import {
   ArrowLeft,
+  ArrowUpRight,
   BarChart3,
+  BookOpen,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -10,13 +12,15 @@ import {
   Eye,
   FileJson,
   FileSpreadsheet,
+  FolderOpen,
   Grid2X2,
+  Home,
   Import,
   Keyboard,
   Languages,
   List,
   Loader2,
-  Lock,
+  Mail,
   Pencil,
   Play,
   Plus,
@@ -24,6 +28,7 @@ import {
   Search,
   Settings2,
   ShieldAlert,
+  Sparkles,
   Tags,
   Trash2,
   Upload,
@@ -56,20 +61,7 @@ import { extractWeakWords, getCorrectAnswer, gradePrompt, makePrompt, orderSente
 import { parseBackup, previewImportFile } from "./importers";
 import { exportDeckFile, type ExportFormat } from "./exporters";
 import { translateEnglishToKorean } from "./translator";
-import {
-  completeOAuthRedirect,
-  formatSupabaseError,
-  getCurrentUser,
-  getSessionUser,
-  isCloudSyncConfigured,
-  onAuthStateChanged,
-  signInWithEmail,
-  signInWithGoogle,
-  signOut,
-  signUpWithEmail,
-  supabaseSchemaHint,
-  uploadLocalSnapshot,
-} from "./sync";
+import { formatSupabaseError } from "./sync";
 import type {
   AppSettings,
   BlankMode,
@@ -84,7 +76,7 @@ import type {
 } from "./types";
 import { createId } from "./utils";
 
-type View = "dashboard" | "manage" | "study" | "result" | "settings";
+type View = "landing" | "dashboard" | "manage" | "study" | "result" | "settings";
 type Notice = { type: "success" | "error"; message: string } | null;
 type SentenceView = "table" | "cards";
 
@@ -103,7 +95,7 @@ function App() {
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const [reviews, setReviews] = useState<ReviewState[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("landing");
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -130,9 +122,6 @@ function App() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationStatus, setTranslationStatus] = useState("");
   const [autoKoreanDirty, setAutoKoreanDirty] = useState(false);
-  const [cloudEmail, setCloudEmail] = useState("");
-  const [cloudPassword, setCloudPassword] = useState("");
-  const [cloudUser, setCloudUser] = useState<{ id: string; email?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const blankRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -170,30 +159,6 @@ function App() {
 
   useEffect(() => {
     void refreshAll();
-    void completeOAuthRedirect()
-      .then(async (user) => {
-        if (!user) {
-          const currentUser = await getCurrentUser().catch(() => null);
-          setCloudUser(currentUser ? { id: currentUser.id, email: currentUser.email } : null);
-          return;
-        }
-        setCloudUser({ id: user.id, email: user.email });
-        await uploadAfterLogin(user.id);
-      })
-      .catch((error: unknown) => {
-        void getSessionUser().then((fallbackUser) => {
-          if (fallbackUser) {
-            setCloudUser({ id: fallbackUser.id, email: fallbackUser.email });
-            void uploadAfterLogin(fallbackUser.id);
-            return;
-          }
-          showNotice("error", `로그인 처리 실패: ${formatSupabaseError(error)}`);
-        });
-      });
-    const unsubscribe = onAuthStateChanged((user) => {
-      setCloudUser(user ? { id: user.id, email: user.email } : null);
-    });
-    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -560,50 +525,106 @@ function App() {
     await moveNext({ ...currentResult, isCorrect: true, forcedCorrect: true });
   }
 
-  async function handleCloudLogin(mode: "login" | "signup") {
-    await runTask(async () => {
-      const user = mode === "login" ? await signInWithEmail(cloudEmail, cloudPassword) : await signUpWithEmail(cloudEmail, cloudPassword);
-      if (!user) throw new Error("로그인 정보를 확인하세요.");
-      setCloudUser({ id: user.id, email: user.email });
-      await uploadAfterLogin(user.id);
-    });
-  }
-
-  async function handleGoogleLogin() {
-    await runTask(async () => {
-      await signInWithGoogle();
-    });
-  }
-
-  async function handleCloudUpload() {
-    if (!cloudUser) return;
-    await runTask(async () => {
-      const result = await uploadLocalSnapshot(cloudUser.id);
-      showNotice("success", `클라우드 스냅샷을 갱신했습니다. 대기 변경 ${result.count}개 처리.`);
-    });
-  }
-
-  async function uploadAfterLogin(userId: string) {
-    try {
-      const result = await uploadLocalSnapshot(userId);
-      showNotice("success", result.uploaded ? "로컬 데이터를 클라우드에 업로드했습니다." : "로그인했습니다.");
-    } catch (error) {
-      showNotice("error", `로그인은 됐지만 업로드 실패: ${formatSupabaseError(error)}`);
-    }
-  }
-
-  async function handleSignOut() {
-    await runTask(async () => {
-      await signOut();
-      setCloudUser(null);
-      showNotice("success", "로그아웃했습니다. 데이터는 브라우저에 그대로 남아 있습니다.");
-    });
-  }
-
   async function saveSettings(next: AppSettings) {
     await updateSettings(next);
     setSettings(next);
     showNotice("success", "설정을 저장했습니다.");
+  }
+
+  function openApp() {
+    setView("dashboard");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function renderLanding() {
+    return (
+      <main className="landingPage">
+        <section className="landingHero">
+          <div className="heroStudyScene" aria-hidden="true">
+            <div className="sceneWindow">
+              <div className="sceneToolbar">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="sceneContent">
+                <div className="sceneMetric">
+                  <strong>24</strong>
+                  <small>오늘 복습</small>
+                </div>
+                <div className="scenePrompt">
+                  <span>이탈리아 음식에 오신 것을 환영합니다.</span>
+                  <p>
+                    Welcome to <mark>Italian</mark> <mark>Food</mark>.
+                  </p>
+                </div>
+                <div className="sceneRows">
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav className="landingNav">
+            <button onClick={openApp}>앱 열기</button>
+            <a href="mailto:jiho@mjiho.com">문의</a>
+          </nav>
+          <div className="landingHeroContent">
+            <p className="eyebrow">SentenceAnki</p>
+            <h1>문장 암기를 시험처럼, 복습은 자동으로.</h1>
+            <p>
+              한국어 해석을 보고 영어 문장의 빈칸을 채우는 학습 흐름에 SRS 복습, 파일 가져오기,
+              오답 재학습을 더한 브라우저 기반 문장 암기 앱입니다.
+            </p>
+            <div className="landingActions">
+              <button className="button primary" onClick={openApp}>
+                <Play size={18} /> 바로 시작하기
+              </button>
+              <a className="button ghost" href="mailto:jiho@mjiho.com">
+                <Mail size={18} /> jiho@mjiho.com
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section className="landingSection">
+          <div className="sectionIntro">
+            <p className="eyebrow">Workflow</p>
+            <h2>자료를 넣고, 바로 테스트하고, 틀린 문장만 다시 봅니다.</h2>
+          </div>
+          <div className="featureGrid">
+            <article>
+              <Upload size={22} />
+              <h3>Excel/CSV/DB 가져오기</h3>
+              <p>ID, English, Korean 컬럼과 기존 SQLite DB를 미리보기로 검증한 뒤 저장합니다.</p>
+            </article>
+            <article>
+              <BookOpen size={22} />
+              <h3>빈칸 학습</h3>
+              <p>난이도와 빈칸 생성 모드를 조절해 실제 시험처럼 문장을 입력합니다.</p>
+            </article>
+            <article>
+              <CalendarClock size={22} />
+              <h3>SRS 복습 큐</h3>
+              <p>오답, 낮은 정답률, 복습 예정일을 기준으로 오늘 볼 문장을 정리합니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="landingBand">
+          <div>
+            <p className="eyebrow">Designed for focus</p>
+            <h2>설명보다 행동이 먼저 보이는 학습 대시보드</h2>
+          </div>
+          <button className="button primary" onClick={openApp}>
+            학습 대시보드 보기 <ArrowUpRight size={18} />
+          </button>
+        </section>
+
+        <SiteFooter />
+      </main>
+    );
   }
 
   function renderDeckCard(deck: Deck) {
@@ -672,13 +693,16 @@ function App() {
 
   function renderDashboard() {
     return (
-      <main className="shell">
+      <main className="shell dashboardShell">
         <section className="topbar">
           <div>
             <p className="eyebrow">SentenceAnki Web</p>
-            <h1>오늘 외울 문장부터 바로 시작하세요</h1>
+            <h1>오늘 할 학습을 한 화면에서 끝내세요</h1>
           </div>
           <div className="topbarActions">
+            <button className="button ghost" onClick={() => setView("landing")}>
+              <Home size={18} /> 소개
+            </button>
             <button className="button ghost" onClick={() => setView("settings")}>
               <Settings2 size={18} /> 설정
             </button>
@@ -691,6 +715,33 @@ function App() {
             <button className="button primary" onClick={handleCreateDeck}>
               <Plus size={18} /> 새 세트
             </button>
+          </div>
+        </section>
+
+        <section className="focusBoard">
+          <div className="focusPrimary">
+            <p className="eyebrow">Next Action</p>
+            <h2>{metrics.dueToday > 0 ? "오늘 복습부터 시작" : activeDeck ? "현재 세트 바로 학습" : "문장 세트 만들기"}</h2>
+            <p>
+              {metrics.dueToday > 0
+                ? "복습 예정 문장을 우선 처리하면 장기 기억 흐름을 유지할 수 있습니다."
+                : activeDeck
+                  ? `${activeDeck.name} 세트에서 이어서 학습할 수 있습니다.`
+                  : "파일을 가져오거나 새 세트를 만들어 첫 학습을 준비하세요."}
+            </p>
+            <div className="focusActions">
+              <button className="button primary" onClick={() => (metrics.dueToday > 0 ? startStudy("due") : activeDeck ? startStudy("all") : handleCreateDeck())}>
+                <Play size={18} /> {metrics.dueToday > 0 ? "복습 시작" : activeDeck ? "학습 시작" : "새 세트 만들기"}
+              </button>
+              <button className="button ghost" onClick={() => fileInputRef.current?.click()}>
+                <Import size={18} /> 자료 가져오기
+              </button>
+            </div>
+          </div>
+          <div className="focusStats">
+            <span><strong>{decks.length}</strong>세트</span>
+            <span><strong>{allSentences.length}</strong>문장</span>
+            <span><strong>{metrics.weak}</strong>취약</span>
           </div>
         </section>
 
@@ -766,7 +817,36 @@ function App() {
             </div>
           )}
         </section>
+        <DashboardNav />
+        <SiteFooter />
       </main>
+    );
+  }
+
+  function DashboardNav() {
+    return (
+      <nav className="floatingTabBar" aria-label="대시보드 주요 기능">
+        <button className="active" onClick={() => setView("dashboard")}>
+          <Home size={18} />
+          <span>홈</span>
+        </button>
+        <button onClick={() => (activeDeck ? setView("manage") : handleCreateDeck())}>
+          <FolderOpen size={18} />
+          <span>세트</span>
+        </button>
+        <button onClick={() => (metrics.dueToday > 0 ? startStudy("due") : startStudy("all"))} disabled={!activeDeck && metrics.dueToday === 0}>
+          <Play size={18} />
+          <span>학습</span>
+        </button>
+        <button onClick={() => fileInputRef.current?.click()}>
+          <Import size={18} />
+          <span>가져오기</span>
+        </button>
+        <button onClick={() => setView("settings")}>
+          <Settings2 size={18} />
+          <span>설정</span>
+        </button>
+      </nav>
     );
   }
 
@@ -1092,33 +1172,11 @@ function App() {
           </div>
           <div className="panel">
             <div className="panelHeader"><div><h2>클라우드 동기화</h2><p>비로그인 상태에서는 브라우저 IndexedDB만 사용합니다.</p></div><Cloud size={22} /></div>
-            {!isCloudSyncConfigured() ? (
-              <div className="cloudDisabled">
-                <Lock size={20} />
-                <strong>Supabase 환경변수가 없어 로컬 모드로 실행 중입니다.</strong>
-                <small>배포 환경에 VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY를 넣고 아래 테이블을 만들면 로그인 동기화가 활성화됩니다.</small>
-                <pre>{supabaseSchemaHint}</pre>
-              </div>
-            ) : cloudUser ? (
-              <div className="cloudBox">
-                <strong>{cloudUser.email ?? "로그인 사용자"}</strong>
-                <button className="button primary" onClick={handleCloudUpload}>지금 업로드</button>
-                <button className="button ghost" onClick={handleSignOut}>로그아웃</button>
-              </div>
-            ) : (
-              <div className="cloudForm">
-                <button className="button googleButton" onClick={handleGoogleLogin}>
-                  <Cloud size={18} /> Google로 로그인
-                </button>
-                <div className="divider"><span>또는 이메일</span></div>
-                <input className="textInput" placeholder="email" value={cloudEmail} onChange={(event) => setCloudEmail(event.target.value)} />
-                <input className="textInput" placeholder="password" type="password" value={cloudPassword} onChange={(event) => setCloudPassword(event.target.value)} />
-                <div className="formActions">
-                  <button className="button primary" onClick={() => handleCloudLogin("login")}>로그인</button>
-                  <button className="button ghost" onClick={() => handleCloudLogin("signup")}>가입</button>
-                </div>
-              </div>
-            )}
+            <div className="comingSoonPanel">
+              <Sparkles size={22} />
+              <strong>준비중입니다.</strong>
+              <p>기기 간 동기화, 학습 진행 상황 저장, 개인 맞춤형 학습 Coming Soon</p>
+            </div>
           </div>
         </section>
       </main>
@@ -1161,6 +1219,7 @@ function App() {
       {notice && <div className={`toast ${notice.type}`}>{notice.message}</div>}
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.db" hidden onChange={(event) => void handleFileImport(event.target.files?.[0] ?? null)} />
       <input ref={backupInputRef} type="file" accept=".json" hidden onChange={(event) => void handleBackupImport(event.target.files?.[0] ?? null)} />
+      {view === "landing" && renderLanding()}
       {view === "dashboard" && renderDashboard()}
       {view === "manage" && renderManage()}
       {view === "study" && renderStudy()}
@@ -1178,6 +1237,16 @@ function EmptyState() {
       <strong>아직 문장 세트가 없습니다.</strong>
       <span>Excel/CSV/DB를 가져오거나 새 세트를 만들어 문장을 추가하세요.</span>
     </div>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="siteFooter">
+      <a href="https://mjiho.com" target="_blank" rel="noreferrer">
+        Made By Jiho Min
+      </a>
+    </footer>
   );
 }
 

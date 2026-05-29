@@ -4,6 +4,9 @@
 
 ## 주요 기능
 
+- 세련된 스크롤형 랜딩 페이지와 문의 이메일 링크
+- 학습 대시보드 전용 iPhone 스타일 glass 하단 내비게이션
+- 빠른 학습 시작을 중심으로 재구성한 대시보드
 - 문장 세트 생성, 이름 수정, 삭제, Excel/CSV/DB/JSON 내보내기
 - 문장 직접 추가, 실시간 보조 번역, 태그 입력, 표/카드 보기 전환
 - Excel/CSV/SQLite DB import 미리보기, 컬럼 검증, 중복/오류 행 표시
@@ -13,7 +16,7 @@
 - 정답 diff 표시, 오타 허용 등 채점 옵션
 - 학습 기록 저장, 문장별 ReviewState, 오늘 복습/밀린 복습/취약 문장 대시보드
 - PWA manifest와 service worker 기반 설치형 앱 shell
-- Supabase 환경변수가 있을 때 로그인 후 로컬 데이터를 클라우드 스냅샷으로 업로드
+- 로그인/기기 간 동기화는 Coming Soon 상태로 잠금
 
 ## 개발
 
@@ -34,28 +37,6 @@ npm.cmd run build
 
 `xlsx`, `sql.js`, `@supabase/supabase-js` 때문에 번들 크기 경고가 날 수 있습니다. 경고만으로 빌드 실패는 아닙니다.
 
-## Supabase 동기화 설정
-
-환경변수가 없으면 앱은 자동으로 로컬 IndexedDB 모드로 동작합니다. 클라우드 동기화를 켜려면 배포 환경에 아래 값을 추가하세요.
-
-```env
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_PUBLISHABLE_KEY=...
-```
-
-현재 구현은 로컬 데이터를 사용자별 JSON 스냅샷으로 업로드하는 MVP 동기화입니다.
-
-```sql
-create table if not exists sentence_anki_snapshots (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  payload jsonb not null,
-  updated_at timestamptz not null default now()
-);
-alter table sentence_anki_snapshots enable row level security;
-create policy "own snapshot" on sentence_anki_snapshots
-for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-```
-
 ## 배포
 
 ```powershell
@@ -63,3 +44,7 @@ npm.cmd run build
 ```
 
 빌드 결과는 `dist`에 생성됩니다. 기존 `.db`, `.exe`, `internal/` 폴더는 이 프로젝트에 포함하지 않는 정책입니다.
+
+## 문의
+
+앱 관련 문의는 `jiho@mjiho.com`으로 보낼 수 있습니다.
