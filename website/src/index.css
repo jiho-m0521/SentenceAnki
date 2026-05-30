@@ -1545,6 +1545,53 @@ input[type="range"] {
   border-color: var(--primary);
 }
 
+.marketWarning,
+.marketOffline {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.marketOffline {
+  margin-top: 12px;
+}
+
+.uploadSourceTabs {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: min(360px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.uploadSourceTabs button {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.uploadSourceTabs button:last-child {
+  border-right: 0;
+}
+
+.uploadSourceTabs button.active {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.marketFileBox {
+  margin-bottom: 12px;
+}
+
 .marketUploadGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

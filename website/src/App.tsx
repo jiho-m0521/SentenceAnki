@@ -98,6 +98,8 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+type MarketUploadSource = "deck" | "file";
+
 const blankModeLabels: Record<BlankMode, string> = {
   random: "랜덤",
   important: "핵심 단어",
@@ -159,11 +161,17 @@ function App() {
   const [marketDecks, setMarketDecks] = useState<MarketplaceDeckSummary[]>([]);
   const [marketDetail, setMarketDetail] = useState<MarketplaceDeckPayload | null>(null);
   const [marketQuery, setMarketQuery] = useState("");
+  const [marketApiAvailable, setMarketApiAvailable] = useState(true);
   const [marketUploadOpen, setMarketUploadOpen] = useState(false);
+  const [marketUploadSource, setMarketUploadSource] = useState<MarketUploadSource>("deck");
+  const [marketUploadDeckId, setMarketUploadDeckId] = useState("");
+  const [marketFileRows, setMarketFileRows] = useState<Array<{ english: string; korean: string; tags?: string[] }>>([]);
+  const [marketFileName, setMarketFileName] = useState("");
   const [marketUpload, setMarketUpload] = useState({ title: "", description: "", authorName: "", tags: "", color: deckColors[0], icon: "book" as DeckIcon });
   const [marketReport, setMarketReport] = useState({ deckId: "", reason: "", detail: "" });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
+  const marketFileInputRef = useRef<HTMLInputElement | null>(null);
   const blankRefs = useRef<Array<HTMLInputElement | null>>([]);
   const latestTranslationRequest = useRef(0);
 
@@ -226,6 +234,10 @@ function App() {
   useEffect(() => {
     if (view === "marketplace") void refreshMarketplace();
   }, [view]);
+
+  useEffect(() => {
+    if (!marketUploadDeckId && activeDeckId) setMarketUploadDeckId(activeDeckId);
+  }, [activeDeckId, marketUploadDeckId]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -648,36 +660,45 @@ function App() {
   }
 
   function openApp() {
-    if (window.location.pathname !== "/app") {
-      window.history.pushState({}, "", "/app");
-    }
-    setView("dashboard");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigateTo("dashboard", "/app");
   }
 
   function openLanding() {
-    if (window.location.pathname !== "/") {
-      window.history.pushState({}, "", "/");
-    }
-    setView("landing");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigateTo("landing", "/");
   }
 
   function openMarketplace() {
-    if (window.location.pathname !== "/marketplace") {
-      window.history.pushState({}, "", "/marketplace");
+    navigateTo("marketplace", "/marketplace");
+  }
+
+  function navigateTo(nextView: View, path: string, replace = false) {
+    if (window.location.pathname !== path) {
+      if (replace) window.history.replaceState({}, "", path);
+      else window.history.pushState({}, "", path);
     }
-    setView("marketplace");
+    setView(nextView);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function readJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      throw new Error("마켓플레이스 API가 연결되지 않았습니다. 로컬 개발 서버에서는 Netlify dev 또는 배포 URL을 사용하세요.");
+    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.issues?.[0] ?? data?.message ?? fallbackMessage);
+    return data as T;
   }
 
   async function refreshMarketplace() {
     try {
       const response = await fetch("/api/marketplace/decks");
-      if (!response.ok) throw new Error("마켓플레이스 목록을 불러오지 못했습니다.");
-      const data = (await response.json()) as { decks?: MarketplaceDeckSummary[] };
+      const data = await readJsonResponse<{ decks?: MarketplaceDeckSummary[] }>(response, "마켓플레이스 목록을 불러오지 못했습니다.");
       setMarketDecks(data.decks ?? []);
+      setMarketApiAvailable(true);
     } catch (error) {
+      setMarketDecks([]);
+      setMarketApiAvailable(false);
       showNotice("error", error instanceof Error ? error.message : "마켓플레이스 목록을 불러오지 못했습니다.");
     }
   }
@@ -685,8 +706,7 @@ function App() {
   async function openMarketplaceDeck(id: string) {
     await runTask(async () => {
       const response = await fetch(`/api/marketplace/decks/${encodeURIComponent(id)}`);
-      if (!response.ok) throw new Error("덱 상세를 불러오지 못했습니다.");
-      setMarketDetail((await response.json()) as MarketplaceDeckPayload);
+      setMarketDetail(await readJsonResponse<MarketplaceDeckPayload>(response, "덱 상세를 불러오지 못했습니다."));
     });
   }
 
@@ -699,26 +719,34 @@ function App() {
       setMarketDetail(null);
       await refreshAll();
       await refreshSentences(deck.id);
-      setView("manage");
-      window.history.pushState({}, "", "/app");
+      navigateTo("manage", "/app");
       showNotice("success", "마켓플레이스 덱을 내 앱으로 가져왔습니다.");
     });
   }
 
-  async function uploadActiveDeckToMarketplace() {
-    if (!activeDeck) {
-      showNotice("error", "업로드할 문장 세트를 먼저 선택하세요.");
+  async function uploadDeckToMarketplace() {
+    if (!marketApiAvailable) {
+      showNotice("error", "마켓플레이스 API가 연결된 배포 URL에서 업로드하세요.");
       return;
     }
-    const deckSentences = await listSentences(activeDeck.id);
+    const sourceDeck = decks.find((deck) => deck.id === marketUploadDeckId);
+    if (marketUploadSource === "deck" && !sourceDeck) {
+      showNotice("error", "업로드할 내 덱을 선택하세요.");
+      return;
+    }
+    const sourceRows = marketUploadSource === "file" ? marketFileRows : await listSentences(sourceDeck!.id);
+    if (sourceRows.length === 0) {
+      showNotice("error", marketUploadSource === "file" ? "업로드할 파일을 먼저 선택하세요." : "선택한 덱에 문장이 없습니다.");
+      return;
+    }
     const { payload, issues } = createMarketplacePayload({
-      title: marketUpload.title || activeDeck.name,
+      title: marketUpload.title || sourceDeck?.name || marketFileName,
       description: marketUpload.description,
       authorName: marketUpload.authorName,
       tags: marketUpload.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       color: marketUpload.color,
       icon: marketUpload.icon,
-      sentences: deckSentences.map((sentence) => ({ english: sentence.english, korean: sentence.korean, tags: sentence.tags })),
+      sentences: sourceRows.map((sentence) => ({ english: sentence.english, korean: sentence.korean, tags: sentence.tags })),
     });
     if (issues.length > 0) {
       showNotice("error", issues[0]);
@@ -730,12 +758,28 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.issues?.[0] ?? data.message ?? "업로드에 실패했습니다.");
+      await readJsonResponse<MarketplaceDeckPayload>(response, "업로드에 실패했습니다.");
       setMarketUploadOpen(false);
+      setMarketFileRows([]);
+      setMarketFileName("");
       await refreshMarketplace();
       showNotice("success", "문장 세트를 마켓플레이스에 공개했습니다.");
     });
+  }
+
+  async function handleMarketplaceFile(file: File | null) {
+    if (!file) return;
+    await runTask(async () => {
+      const preview = await previewImportFile(file, []);
+      const rows = preview.validRows.map((row) => ({ english: row.english, korean: row.korean }));
+      if (rows.length === 0) throw new Error("업로드할 수 있는 문장이 없습니다.");
+      setMarketFileRows(rows);
+      setMarketFileName(preview.deckName);
+      setMarketUpload((form) => ({ ...form, title: form.title || preview.deckName }));
+      setMarketUploadSource("file");
+      showNotice("success", `${rows.length}개 문장을 업로드 준비했습니다.`);
+    });
+    if (marketFileInputRef.current) marketFileInputRef.current.value = "";
   }
 
   async function reportMarketplaceDeck() {
@@ -746,7 +790,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(marketReport),
       });
-      if (!response.ok) throw new Error("신고를 접수하지 못했습니다.");
+      await readJsonResponse<{ ok: boolean }>(response, "신고를 접수하지 못했습니다.");
       setMarketReport({ deckId: "", reason: "", detail: "" });
       showNotice("success", "신고가 접수되었습니다.");
     });
@@ -1583,11 +1627,43 @@ function App() {
           <section className="panel marketUploadPanel">
             <div className="panelHeader">
               <div>
-                <h2>현재 선택한 덱 공개</h2>
-                <p>{activeDeck ? `"${activeDeck.name}" 세트를 즉시 공개합니다. 문장 수와 크기 제한을 통과해야 합니다.` : "먼저 앱에서 공개할 덱을 선택하세요."}</p>
+                <h2>문장 세트 공개</h2>
+                <p>내 앱에 저장된 덱을 선택하거나 Excel/CSV/DB 파일을 올려 즉시 공개합니다.</p>
               </div>
               <ShoppingBag size={22} />
             </div>
+            {!marketApiAvailable && (
+              <div className="marketWarning">
+                로컬 Vite 서버에서는 마켓 API가 연결되지 않습니다. 업로드와 목록 확인은 배포 URL 또는 Netlify dev에서 작동합니다.
+              </div>
+            )}
+            <div className="uploadSourceTabs" role="tablist" aria-label="마켓 업로드 방식">
+              <button className={marketUploadSource === "deck" ? "active" : ""} onClick={() => setMarketUploadSource("deck")}>내 덱 선택</button>
+              <button className={marketUploadSource === "file" ? "active" : ""} onClick={() => setMarketUploadSource("file")}>파일 업로드</button>
+            </div>
+            {marketUploadSource === "deck" ? (
+              <label className="field">
+                <span>공개할 내 덱</span>
+                <select className="textInput" value={marketUploadDeckId} onChange={(event) => {
+                  const deckId = event.target.value;
+                  const deck = decks.find((item) => item.id === deckId);
+                  setMarketUploadDeckId(deckId);
+                  if (deck) setMarketUpload((form) => ({ ...form, title: form.title || deck.name, color: deck.color ?? form.color, icon: deck.icon ?? form.icon }));
+                }}>
+                  <option value="">덱을 선택하세요</option>
+                  {decks.map((deck) => <option value={deck.id} key={deck.id}>{deck.name}</option>)}
+                </select>
+              </label>
+            ) : (
+              <div className="marketFileBox">
+                <button className="uploadBox" onClick={() => marketFileInputRef.current?.click()}>
+                  <Import size={26} />
+                  <span>{marketFileName ? marketFileName : "파일 선택"}</span>
+                  <small>{marketFileRows.length > 0 ? `${marketFileRows.length}개 문장 준비됨` : ".xlsx, .xls, .csv, .db"}</small>
+                </button>
+                <input ref={marketFileInputRef} type="file" accept=".xlsx,.xls,.csv,.db" hidden onChange={(event) => void handleMarketplaceFile(event.target.files?.[0] ?? null)} />
+              </div>
+            )}
             <div className="marketUploadGrid">
               <input className="textInput" placeholder="덱 이름" value={marketUpload.title} onChange={(event) => setMarketUpload((form) => ({ ...form, title: event.target.value }))} />
               <input className="textInput" placeholder="제작자 표시명" value={marketUpload.authorName} onChange={(event) => setMarketUpload((form) => ({ ...form, authorName: event.target.value }))} />
@@ -1604,7 +1680,7 @@ function App() {
             </div>
             <div className="formActions">
               <button className="button ghost" onClick={() => setMarketUploadOpen(false)}>취소</button>
-              <button className="button primary" onClick={() => void uploadActiveDeckToMarketplace()} disabled={!activeDeck}>즉시 공개</button>
+              <button className="button primary" onClick={() => void uploadDeckToMarketplace()} disabled={!marketApiAvailable}>즉시 공개</button>
             </div>
           </section>
         )}
@@ -1613,7 +1689,8 @@ function App() {
           <div>
             <p className="eyebrow">Open Decks</p>
             <h2>공유된 빈칸 학습 덱</h2>
-            <p>업로드된 덱은 즉시 공개됩니다. 부적절한 덱은 상세 화면에서 신고할 수 있습니다.</p>
+          <p>업로드된 덱은 즉시 공개됩니다. 부적절한 덱은 상세 화면에서 신고할 수 있습니다.</p>
+          {!marketApiAvailable && <p className="marketOffline">현재 로컬 서버라 마켓 API가 연결되지 않았습니다. 배포 URL에서는 정상 작동합니다.</p>}
           </div>
           <label className="searchBox">
             <Search size={18} />
