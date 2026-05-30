@@ -4,7 +4,7 @@
   publish = "dist"
 
 [functions]
-  directory = "website/netlify/functions"
+  directory = "netlify/functions"
   node_bundler = "esbuild"
 
 [[redirects]]
