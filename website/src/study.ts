@@ -3,6 +3,7 @@ import type {
   AppSettings,
   BlankMode,
   GradingOptions,
+  LearningStats,
   ReviewState,
   Sentence,
   StudyPrompt,
@@ -45,6 +46,12 @@ export const defaultSettings: AppSettings = {
     autoAdvanceCorrect: true,
     showHintButton: true,
     manualNextAfterWrong: true,
+  },
+  autoDifficulty: true,
+  dailyGoal: 20,
+  deckAppearanceDefaults: {
+    color: "#2563eb",
+    icon: "book",
   },
   defaultExportIncludesHistory: false,
   automaticBackup: false,
@@ -116,11 +123,13 @@ function pickBlankWords(sentence: Sentence, difficulty: number, blankMode: Blank
 }
 
 export function makePrompt(sentence: Sentence, difficulty: number, blankMode: BlankMode = "random", weakWords: string[] = []): StudyPrompt {
-  const selectedWords = pickBlankWords(sentence, difficulty, blankMode, weakWords);
+  const boundedDifficulty = clampDifficulty(difficulty);
+  const selectedWords = pickBlankWords(sentence, boundedDifficulty, blankMode, weakWords);
 
   if (selectedWords.length === 0) {
     return {
       sentence,
+      difficulty: boundedDifficulty,
       blanks: [{ index: 0, answer: sentence.english, hint: sentence.english.slice(0, 1) }],
       parts: [{ type: "blank", index: 0, answer: sentence.english, hint: sentence.english.slice(0, 1) }],
     };
@@ -135,7 +144,7 @@ export function makePrompt(sentence: Sentence, difficulty: number, blankMode: Bl
     cursor = blank.word.end;
   }
   if (cursor < sentence.english.length) parts.push({ type: "text", value: sentence.english.slice(cursor) });
-  return { sentence, blanks: blanks.map(({ index, answer, hint }) => ({ index, answer, hint })), parts };
+  return { sentence, difficulty: boundedDifficulty, blanks: blanks.map(({ index, answer, hint }) => ({ index, answer, hint })), parts };
 }
 
 export function getCorrectAnswer(prompt: StudyPrompt) {
@@ -226,4 +235,45 @@ export function extractWeakWords(records: StudyRecord[], sentences: Sentence[]) 
     .filter((record) => !record.isCorrect)
     .flatMap((record) => wordsFrom(sentenceMap.get(record.sentenceId)?.english ?? "").map((word) => word.normalized))
     .slice(-80);
+}
+
+export function clampDifficulty(value: number) {
+  return Math.max(1, Math.min(5, Math.round(value)));
+}
+
+export function recommendDifficulty(baseDifficulty: number, review: ReviewState | undefined) {
+  const base = clampDifficulty(baseDifficulty);
+  if (!review || review.attempts === 0) return base;
+  const accuracy = review.correctAttempts / Math.max(1, review.attempts);
+  if (review.lastWrong || accuracy < 0.7) return clampDifficulty(base + 1);
+  if (review.streak >= 3) return clampDifficulty(base - 1);
+  return base;
+}
+
+function localDayKey(value: string) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function calculateLearningStats(records: StudyRecord[], dailyGoal: number, now = new Date()): LearningStats {
+  const todayKey = localDayKey(now.toISOString());
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const dayKeys = new Set(records.map((record) => localDayKey(record.studiedAt)));
+  let streakDays = 0;
+  const cursor = new Date(now);
+  cursor.setHours(12, 0, 0, 0);
+  while (dayKeys.has(localDayKey(cursor.toISOString()))) {
+    streakDays += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  const weeklyRecords = records.filter((record) => new Date(record.studiedAt) >= weekStart);
+  const weeklyAccuracy = weeklyRecords.length === 0 ? 0 : Math.round((weeklyRecords.filter((record) => record.isCorrect).length / weeklyRecords.length) * 100);
+  return {
+    todayStudied: records.filter((record) => localDayKey(record.studiedAt) === todayKey).length,
+    dailyGoal: Math.max(1, dailyGoal || 20),
+    streakDays,
+    weeklyAccuracy,
+  };
 }

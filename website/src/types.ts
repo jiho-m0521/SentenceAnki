@@ -1,8 +1,11 @@
 export type SyncStatus = "local" | "pending" | "synced" | "conflict";
+export type DeckIcon = "book" | "message" | "graduation" | "star" | "coffee" | "globe";
 
 export type Deck = {
   id: string;
   name: string;
+  color?: string;
+  icon?: DeckIcon;
   tags: string[];
   source?: string;
   archived: boolean;
@@ -49,6 +52,12 @@ export type AppSettings = {
   grading: GradingOptions;
   blankMode: BlankMode;
   studyScreen: StudyScreenOptions;
+  autoDifficulty: boolean;
+  dailyGoal: number;
+  deckAppearanceDefaults?: {
+    color: string;
+    icon: DeckIcon;
+  };
   defaultExportIncludesHistory: boolean;
   automaticBackup: boolean;
   updatedAt: string;
@@ -66,6 +75,7 @@ export type StudySession = {
 
 export type StudyPrompt = {
   sentence: Sentence;
+  difficulty: number;
   blanks: Array<{
     index: number;
     answer: string;
@@ -164,4 +174,43 @@ export type DashboardMetrics = {
   overdue: number;
   weak: number;
   recentRecords: StudyRecord[];
+};
+
+export type LearningStats = {
+  todayStudied: number;
+  dailyGoal: number;
+  streakDays: number;
+  weeklyAccuracy: number;
+};
+
+export type MarketplaceDeckSummary = {
+  id: string;
+  title: string;
+  description: string;
+  authorName: string;
+  tags: string[];
+  sentenceCount: number;
+  downloads: number;
+  createdAt: string;
+  updatedAt: string;
+  color?: string;
+  icon?: DeckIcon;
+};
+
+export type MarketplaceSentence = {
+  english: string;
+  korean: string;
+  tags?: string[];
+};
+
+export type MarketplaceDeckPayload = {
+  summary: MarketplaceDeckSummary;
+  sentences: MarketplaceSentence[];
+};
+
+export type MarketplaceReport = {
+  deckId: string;
+  reason: string;
+  detail?: string;
+  createdAt: string;
 };

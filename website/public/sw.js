@@ -1,5 +1,5 @@
-const CACHE_NAME = "sentence-anki-shell-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "sentence-anki-shell-v2";
+const APP_SHELL = ["/", "/app", "/marketplace", "/manifest.webmanifest", "/icon.svg", "/og-image.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

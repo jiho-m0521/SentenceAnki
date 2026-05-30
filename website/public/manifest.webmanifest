@@ -1,8 +1,8 @@
 {
-  "name": "SentenceAnki",
+  "name": "SentenceAnki - 문장 빈칸 암기",
   "short_name": "SentenceAnki",
-  "description": "문장 빈칸 암기와 SRS 복습을 위한 로컬 우선 학습 앱",
-  "start_url": "/",
+  "description": "문장 빈칸 테스트, SRS 복습, 문장 마켓플레이스를 위한 로컬 우선 학습 앱",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#f5f7fb",
   "theme_color": "#2563eb",

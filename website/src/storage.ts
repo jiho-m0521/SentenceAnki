@@ -74,10 +74,22 @@ function getDb() {
 function normalizeDeck(deck: Deck): Deck {
   return {
     ...deck,
+    color: deck.color ?? "#2563eb",
+    icon: deck.icon ?? "book",
     tags: deck.tags ?? [],
     archived: deck.archived ?? false,
     deleted: deck.deleted ?? false,
     orderIndex: deck.orderIndex ?? 0,
+  };
+}
+
+function normalizeSettings(settings: AppSettings): AppSettings {
+  return {
+    ...defaultSettings,
+    ...settings,
+    grading: { ...defaultSettings.grading, ...settings.grading },
+    studyScreen: { ...defaultSettings.studyScreen, ...settings.studyScreen },
+    deckAppearanceDefaults: settings.deckAppearanceDefaults ?? defaultSettings.deckAppearanceDefaults,
   };
 }
 
@@ -123,6 +135,8 @@ export async function createDeck(name: string) {
   const deck: Deck = {
     id: createId("deck"),
     name: name.trim() || "새 문장 세트",
+    color: defaultSettings.deckAppearanceDefaults?.color,
+    icon: defaultSettings.deckAppearanceDefaults?.icon,
     tags: [],
     archived: false,
     orderIndex: Date.now(),
@@ -256,14 +270,14 @@ export async function addImportedSentences(deckId: string, rows: Array<{ english
 export async function getSettings() {
   const db = await getDb();
   const settings = await db.get("settings", "default");
-  if (settings) return settings;
+  if (settings) return normalizeSettings(settings);
   await db.put("settings", defaultSettings);
   return defaultSettings;
 }
 
 export async function updateSettings(next: AppSettings) {
   const db = await getDb();
-  const settings = { ...next, updatedAt: nowIso() };
+  const settings = normalizeSettings({ ...next, updatedAt: nowIso() });
   await db.put("settings", settings);
   await enqueue("settings", "default", "upsert");
   return settings;
@@ -316,7 +330,7 @@ export async function importBackup(payload: BackupPayload) {
   await Promise.all(payload.sentences.map((sentence) => tx.objectStore("sentences").put(normalizeSentence(sentence))));
   await Promise.all((payload.studyRecords ?? []).map((record) => tx.objectStore("studyRecords").put(record)));
   await Promise.all((payload.reviewStates ?? []).map((state) => tx.objectStore("reviewStates").put(state)));
-  if (payload.settings) await tx.objectStore("settings").put(payload.settings);
+  if (payload.settings) await tx.objectStore("settings").put(normalizeSettings(payload.settings));
   await tx.done;
 }
 

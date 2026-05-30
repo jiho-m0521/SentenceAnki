@@ -8,18 +8,24 @@ import {
   Check,
   CheckCircle2,
   Cloud,
+  Coffee,
   Download,
   Eye,
   FileJson,
   FileSpreadsheet,
   FolderOpen,
+  Flag,
+  Flame,
   Grid2X2,
+  Globe2,
+  GraduationCap,
   Home,
   Import,
   Keyboard,
   Languages,
   List,
   Loader2,
+  MessageSquare,
   Pencil,
   Play,
   Plus,
@@ -27,13 +33,17 @@ import {
   Search,
   Settings2,
   ShieldAlert,
+  ShoppingBag,
   Sparkles,
+  Star,
   Tags,
+  Target,
   Trash2,
   Upload,
   X,
+  type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import {
   addImportedSentences,
   clearDeckSentences,
@@ -56,16 +66,20 @@ import {
   upsertSentence,
 } from "./storage";
 import { downloadJson, formatDateTime, formatDuration, nowIso } from "./utils";
-import { extractWeakWords, getCorrectAnswer, gradePrompt, makePrompt, orderSentences } from "./study";
+import { calculateLearningStats, extractWeakWords, getCorrectAnswer, gradePrompt, makePrompt, orderSentences, recommendDifficulty } from "./study";
 import { parseBackup, previewImportFile } from "./importers";
 import { exportDeckFile, type ExportFormat } from "./exporters";
 import { translateEnglishToKorean } from "./translator";
 import { formatSupabaseError } from "./sync";
+import { createMarketplacePayload, deckColors, deckIcons } from "./marketplace";
 import type {
   AppSettings,
   BlankMode,
   Deck,
+  DeckIcon,
   ImportPreview,
+  MarketplaceDeckPayload,
+  MarketplaceDeckSummary,
   ReviewState,
   Sentence,
   StudyMode,
@@ -75,7 +89,7 @@ import type {
 } from "./types";
 import { createId } from "./utils";
 
-type View = "landing" | "dashboard" | "manage" | "study" | "result" | "settings";
+type View = "landing" | "dashboard" | "manage" | "study" | "result" | "settings" | "marketplace";
 type Notice = { type: "success" | "error"; message: string } | null;
 type SentenceView = "table" | "cards";
 
@@ -91,6 +105,21 @@ const blankModeLabels: Record<BlankMode, string> = {
   phrase: "구문 단위",
 };
 
+const deckIconMap: Record<DeckIcon, LucideIcon> = {
+  book: BookOpen,
+  message: MessageSquare,
+  graduation: GraduationCap,
+  star: Star,
+  coffee: Coffee,
+  globe: Globe2,
+};
+
+function viewFromPath(): View {
+  if (window.location.pathname.startsWith("/marketplace")) return "marketplace";
+  if (window.location.pathname.startsWith("/app")) return "dashboard";
+  return "landing";
+}
+
 function App() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
@@ -99,7 +128,7 @@ function App() {
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const [reviews, setReviews] = useState<ReviewState[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [view, setView] = useState<View>(() => (window.location.pathname.startsWith("/app") ? "dashboard" : "landing"));
+  const [view, setView] = useState<View>(() => viewFromPath());
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -127,6 +156,12 @@ function App() {
   const [translationStatus, setTranslationStatus] = useState("");
   const [autoKoreanDirty, setAutoKoreanDirty] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [marketDecks, setMarketDecks] = useState<MarketplaceDeckSummary[]>([]);
+  const [marketDetail, setMarketDetail] = useState<MarketplaceDeckPayload | null>(null);
+  const [marketQuery, setMarketQuery] = useState("");
+  const [marketUploadOpen, setMarketUploadOpen] = useState(false);
+  const [marketUpload, setMarketUpload] = useState({ title: "", description: "", authorName: "", tags: "", color: deckColors[0], icon: "book" as DeckIcon });
+  const [marketReport, setMarketReport] = useState({ deckId: "", reason: "", detail: "" });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const blankRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -162,17 +197,35 @@ function App() {
     };
   }, [records, reviews]);
 
+  const learningStats = useMemo(() => calculateLearningStats(records, settings?.dailyGoal ?? 20), [records, settings?.dailyGoal]);
+
+  const filteredMarketDecks = useMemo(() => {
+    const keyword = marketQuery.trim().toLocaleLowerCase();
+    if (!keyword) return marketDecks;
+    return marketDecks.filter(
+      (deck) =>
+        deck.title.toLocaleLowerCase().includes(keyword) ||
+        deck.description.toLocaleLowerCase().includes(keyword) ||
+        deck.authorName.toLocaleLowerCase().includes(keyword) ||
+        deck.tags.join(" ").toLocaleLowerCase().includes(keyword),
+    );
+  }, [marketDecks, marketQuery]);
+
   useEffect(() => {
     void refreshAll();
   }, []);
 
   useEffect(() => {
     const handlePopState = () => {
-      setView(window.location.pathname.startsWith("/app") ? "dashboard" : "landing");
+      setView(viewFromPath());
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  useEffect(() => {
+    if (view === "marketplace") void refreshMarketplace();
+  }, [view]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -298,6 +351,14 @@ function App() {
       await refreshAll();
       setView("manage");
       showNotice("success", "새 문장 세트를 만들었습니다.");
+    });
+  }
+
+  async function updateDeckAppearance(deck: Deck, updates: Pick<Deck, "color" | "icon">) {
+    await runTask(async () => {
+      await updateDeck({ ...deck, ...updates });
+      await refreshAll();
+      showNotice("success", "세트 디자인을 변경했습니다.");
     });
   }
 
@@ -497,13 +558,40 @@ function App() {
     }
     const ordered = orderSentences(base, studyMode, reviews);
     const weakWords = extractWeakWords(records, allSentences);
+    const reviewBySentence = new Map(reviews.map((review) => [review.sentenceId, review]));
     setSessionId(createId("session"));
     setStudySource(ordered);
-    setPrompts(ordered.map((sentence) => makePrompt(sentence, difficulty, settings?.blankMode ?? "random", weakWords)));
+    setPrompts(
+      ordered.map((sentence) =>
+        makePrompt(
+          sentence,
+          settings?.autoDifficulty ? recommendDifficulty(difficulty, reviewBySentence.get(sentence.id)) : difficulty,
+          settings?.blankMode ?? "random",
+          weakWords,
+        ),
+      ),
+    );
     setCurrentIndex(0);
     setResults([]);
     setCurrentResult(null);
     setView("study");
+  }
+
+  function startSmartDue() {
+    if (metrics.dueToday > 0) startStudy("due");
+    else if (activeDeck) startStudy("all");
+    else void handleCreateDeck();
+  }
+
+  function startLastDeck() {
+    if (activeDeck) startStudy("all");
+    else void handleCreateDeck();
+  }
+
+  function startSmartWrong() {
+    if (metrics.weak > 0) startStudy("weak");
+    else if (activeDeck) startStudy("all");
+    else void handleCreateDeck();
   }
 
   async function submitAnswer(event?: FormEvent) {
@@ -516,6 +604,7 @@ function App() {
 
   async function persistResults(nextResults: StudyResult[]) {
     if (!activeDeckId) return;
+    const promptBySentence = new Map(prompts.map((prompt) => [prompt.sentence.id, prompt]));
     const recordItems: StudyRecord[] = nextResults.map((result) => ({
       id: createId("record"),
       deckId: activeDeckId,
@@ -525,7 +614,7 @@ function App() {
       correctAnswer: result.correctAnswer,
       isCorrect: result.isCorrect,
       forcedCorrect: result.forcedCorrect,
-      difficulty,
+      difficulty: promptBySentence.get(result.sentenceId)?.difficulty ?? difficulty,
       blankMode: settings?.blankMode ?? "random",
       responseMs: result.responseMs,
       studiedAt: result.completedAt,
@@ -574,6 +663,123 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function openMarketplace() {
+    if (window.location.pathname !== "/marketplace") {
+      window.history.pushState({}, "", "/marketplace");
+    }
+    setView("marketplace");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function refreshMarketplace() {
+    try {
+      const response = await fetch("/api/marketplace/decks");
+      if (!response.ok) throw new Error("마켓플레이스 목록을 불러오지 못했습니다.");
+      const data = (await response.json()) as { decks?: MarketplaceDeckSummary[] };
+      setMarketDecks(data.decks ?? []);
+    } catch (error) {
+      showNotice("error", error instanceof Error ? error.message : "마켓플레이스 목록을 불러오지 못했습니다.");
+    }
+  }
+
+  async function openMarketplaceDeck(id: string) {
+    await runTask(async () => {
+      const response = await fetch(`/api/marketplace/decks/${encodeURIComponent(id)}`);
+      if (!response.ok) throw new Error("덱 상세를 불러오지 못했습니다.");
+      setMarketDetail((await response.json()) as MarketplaceDeckPayload);
+    });
+  }
+
+  async function importMarketplaceDeck(payload: MarketplaceDeckPayload) {
+    await runTask(async () => {
+      const deck = await createDeck(payload.summary.title);
+      await updateDeck({ ...deck, color: payload.summary.color, icon: payload.summary.icon, tags: payload.summary.tags, source: "marketplace" });
+      await addImportedSentences(deck.id, payload.sentences);
+      setActiveDeckId(deck.id);
+      setMarketDetail(null);
+      await refreshAll();
+      await refreshSentences(deck.id);
+      setView("manage");
+      window.history.pushState({}, "", "/app");
+      showNotice("success", "마켓플레이스 덱을 내 앱으로 가져왔습니다.");
+    });
+  }
+
+  async function uploadActiveDeckToMarketplace() {
+    if (!activeDeck) {
+      showNotice("error", "업로드할 문장 세트를 먼저 선택하세요.");
+      return;
+    }
+    const deckSentences = await listSentences(activeDeck.id);
+    const { payload, issues } = createMarketplacePayload({
+      title: marketUpload.title || activeDeck.name,
+      description: marketUpload.description,
+      authorName: marketUpload.authorName,
+      tags: marketUpload.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      color: marketUpload.color,
+      icon: marketUpload.icon,
+      sentences: deckSentences.map((sentence) => ({ english: sentence.english, korean: sentence.korean, tags: sentence.tags })),
+    });
+    if (issues.length > 0) {
+      showNotice("error", issues[0]);
+      return;
+    }
+    await runTask(async () => {
+      const response = await fetch("/api/marketplace/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.issues?.[0] ?? data.message ?? "업로드에 실패했습니다.");
+      setMarketUploadOpen(false);
+      await refreshMarketplace();
+      showNotice("success", "문장 세트를 마켓플레이스에 공개했습니다.");
+    });
+  }
+
+  async function reportMarketplaceDeck() {
+    if (!marketReport.deckId || !marketReport.reason.trim()) return;
+    await runTask(async () => {
+      const response = await fetch("/api/marketplace/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(marketReport),
+      });
+      if (!response.ok) throw new Error("신고를 접수하지 못했습니다.");
+      setMarketReport({ deckId: "", reason: "", detail: "" });
+      showNotice("success", "신고가 접수되었습니다.");
+    });
+  }
+
+  async function exportMarketplaceDeck(payload: MarketplaceDeckPayload, format: Extract<ExportFormat, "json" | "xlsx">) {
+    const deck: Deck = {
+      id: payload.summary.id,
+      name: payload.summary.title,
+      color: payload.summary.color,
+      icon: payload.summary.icon,
+      tags: payload.summary.tags,
+      source: "marketplace",
+      archived: false,
+      orderIndex: 0,
+      createdAt: payload.summary.createdAt,
+      updatedAt: payload.summary.updatedAt,
+    };
+    const sentenceItems: Sentence[] = payload.sentences.map((sentence, index) => ({
+      id: `${payload.summary.id}_${index}`,
+      deckId: payload.summary.id,
+      english: sentence.english,
+      korean: sentence.korean,
+      selected: false,
+      tags: sentence.tags ?? [],
+      archived: false,
+      orderIndex: index,
+      createdAt: payload.summary.createdAt,
+      updatedAt: payload.summary.updatedAt,
+    }));
+    await exportDeckFile(deck, sentenceItems, format, { includeHistory: false });
+  }
+
   async function installApp() {
     if (!installPrompt) {
       showNotice("error", "브라우저가 아직 앱 설치를 제공하지 않습니다. 주소창의 설치 아이콘이나 브라우저 메뉴를 확인하세요.");
@@ -591,6 +797,27 @@ function App() {
     return (
       <main className="landingPage">
         <section className="landingHero">
+          <nav className="landingNav">
+            <button onClick={openApp}>앱 열기</button>
+            <button onClick={openMarketplace}>마켓</button>
+            <button onClick={() => void installApp()}>설치</button>
+          </nav>
+          <div className="landingHeroContent">
+            <p className="eyebrow">SentenceAnki</p>
+            <h1>문장 암기, 빈칸 테스트, 복습 루틴까지 한 번에.</h1>
+            <p>
+              한국어 해석을 보고 직접 영어 빈칸을 채우는 시험형 학습에 자동 난이도 추천, SRS 복습,
+              문장 마켓플레이스를 더한 로컬 우선 학습 앱입니다.
+            </p>
+            <div className="landingActions">
+              <button className="button primary" onClick={openApp}>
+                <Play size={18} /> 바로 시작하기
+              </button>
+              <button className="button ghost" onClick={() => void installApp()}>
+                <Download size={18} /> 앱 설치하기
+              </button>
+            </div>
+          </div>
           <div className="heroStudyScene" aria-hidden="true">
             <div className="sceneWindow">
               <div className="sceneToolbar">
@@ -599,9 +826,15 @@ function App() {
                 <span />
               </div>
               <div className="sceneContent">
-                <div className="sceneMetric">
-                  <strong>24</strong>
-                  <small>오늘 복습</small>
+                <div className="sceneMetricRow">
+                  <div className="sceneMetric">
+                    <strong>24</strong>
+                    <small>오늘 복습</small>
+                  </div>
+                  <div className="sceneMetric">
+                    <strong>91%</strong>
+                    <small>이번 주 정답률</small>
+                  </div>
                 </div>
                 <div className="scenePrompt">
                   <span>이탈리아 음식에 오신 것을 환영합니다.</span>
@@ -617,59 +850,54 @@ function App() {
               </div>
             </div>
           </div>
-          <nav className="landingNav">
-            <button onClick={openApp}>앱 열기</button>
-            <button onClick={() => void installApp()}>다운로드</button>
-          </nav>
-          <div className="landingHeroContent">
-            <p className="eyebrow">SentenceAnki</p>
-            <h1>문장 암기를 시험처럼, 복습은 자동으로.</h1>
-            <p>
-              한국어 해석을 보고 영어 문장의 빈칸을 채우는 학습 흐름에 SRS 복습, 파일 가져오기,
-              오답 재학습을 더한 브라우저 기반 문장 암기 앱입니다.
-            </p>
-            <div className="landingActions">
-              <button className="button primary" onClick={openApp}>
-                <Play size={18} /> 바로 시작하기
-              </button>
-              <button className="button ghost" onClick={() => void installApp()}>
-                <Download size={18} /> 앱 설치하기
-              </button>
-            </div>
-          </div>
         </section>
 
         <section className="landingSection">
           <div className="sectionIntro">
-            <p className="eyebrow">Workflow</p>
-            <h2>자료를 넣고, 바로 테스트하고, 틀린 문장만 다시 봅니다.</h2>
+            <p className="eyebrow">Core Flow</p>
+            <h2>자료를 넣고, 테스트하고, 기억이 약한 문장만 다시 봅니다.</h2>
           </div>
           <div className="featureGrid">
             <article>
               <Upload size={22} />
-              <h3>Excel/CSV/DB 가져오기</h3>
-              <p>ID, English, Korean 컬럼과 기존 SQLite DB를 미리보기로 검증한 뒤 저장합니다.</p>
+              <h3>파일 가져오기</h3>
+              <p>ID, English, Korean 컬럼 형식을 미리 확인하고 Excel, CSV, DB를 가져옵니다.</p>
             </article>
             <article>
               <BookOpen size={22} />
-              <h3>빈칸 학습</h3>
-              <p>난이도와 빈칸 생성 모드를 조절해 실제 시험처럼 문장을 입력합니다.</p>
+              <h3>빈칸 테스트</h3>
+              <p>난이도와 문장별 기록에 맞춰 빈칸 수를 조절하고 실제 시험처럼 입력합니다.</p>
             </article>
             <article>
               <CalendarClock size={22} />
-              <h3>SRS 복습 큐</h3>
-              <p>오답, 낮은 정답률, 복습 예정일을 기준으로 오늘 볼 문장을 정리합니다.</p>
+              <h3>SRS 복습</h3>
+              <p>오답, 정답률, 복습 예정일을 기준으로 오늘 볼 문장을 정리합니다.</p>
+            </article>
+            <article>
+              <RotateCcw size={22} />
+              <h3>오답 재학습</h3>
+              <p>틀린 문장만 다시 묶어 같은 흐름으로 빠르게 반복합니다.</p>
+            </article>
+            <article>
+              <ShoppingBag size={22} />
+              <h3>문장 마켓</h3>
+              <p>직접 만든 덱을 공개하고 다른 유저의 덱을 내 앱으로 가져옵니다.</p>
+            </article>
+            <article>
+              <Sparkles size={22} />
+              <h3>PWA 설치</h3>
+              <p>브라우저 저장 기반으로 동작하며 설치형 웹앱처럼 사용할 수 있습니다.</p>
             </article>
           </div>
         </section>
 
         <section className="landingBand">
           <div>
-            <p className="eyebrow">Designed for focus</p>
-            <h2>설명보다 행동이 먼저 보이는 학습 대시보드</h2>
+            <p className="eyebrow">Marketplace</p>
+            <h2>내가 만든 문장 세트를 공유하고, 필요한 덱은 바로 가져오세요.</h2>
           </div>
-          <button className="button primary" onClick={openApp}>
-            학습 대시보드 보기 <ArrowUpRight size={18} />
+          <button className="button primary" onClick={openMarketplace}>
+            마켓플레이스 보기 <ArrowUpRight size={18} />
           </button>
         </section>
 
@@ -679,8 +907,13 @@ function App() {
   }
 
   function renderDeckCard(deck: Deck) {
+    const Icon = deckIconMap[deck.icon ?? "book"];
+    const deckColor = deck.color ?? deckColors[0];
     return (
-      <article className={`deckCard ${deck.id === activeDeckId ? "active" : ""}`} key={deck.id}>
+      <article className={`deckCard ${deck.id === activeDeckId ? "active" : ""}`} key={deck.id} style={{ "--deck-color": deckColor } as CSSProperties}>
+        <div className="deckCoverIcon" aria-hidden="true">
+          <Icon size={18} />
+        </div>
         {renamingDeckId === deck.id ? (
           <form
             className="deckRenameForm"
@@ -716,6 +949,22 @@ function App() {
             <small>수정 {formatDateTime(deck.updatedAt)}</small>
           </button>
         )}
+        <div className="deckAppearance" aria-label={`${deck.name} 색상과 아이콘`}>
+          <div className="colorSwatches">
+            {deckColors.map((color) => (
+              <button
+                aria-label={`${color} 색상 적용`}
+                className={color === deckColor ? "active" : ""}
+                key={color}
+                onClick={() => void updateDeckAppearance(deck, { color, icon: deck.icon ?? "book" })}
+                style={{ background: color }}
+              />
+            ))}
+          </div>
+          <select value={deck.icon ?? "book"} onChange={(event) => void updateDeckAppearance(deck, { color: deckColor, icon: event.target.value as DeckIcon })}>
+            {deckIcons.map((icon) => <option value={icon} key={icon}>{icon}</option>)}
+          </select>
+        </div>
         <div className="deckIconActions" aria-label={`${deck.name} 작업`}>
           <button className="iconButton small" aria-label={`${deck.name} 이름 수정`} onClick={() => { setRenamingDeckId(deck.id); setRenamingDeckName(deck.name); }}>
             <Pencil size={16} />
@@ -754,19 +1003,40 @@ function App() {
             <button className="button ghost" onClick={openLanding}>
               <Home size={18} /> 소개
             </button>
+            <button className="button ghost" onClick={openMarketplace}>
+              <ShoppingBag size={18} /> 마켓
+            </button>
             <button className="button ghost" onClick={() => setView("settings")}>
               <Settings2 size={18} /> 설정
             </button>
-            <button className="button ghost" onClick={() => backupInputRef.current?.click()}>
-              <FileJson size={18} /> 백업 가져오기
+            <button className="button ghost compactLabel" onClick={() => backupInputRef.current?.click()}>
+              <FileJson size={18} /> <span data-short="가져오기">백업 가져오기</span>
             </button>
-            <button className="button ghost" onClick={handleBackupExport} disabled={decks.length === 0}>
-              <Download size={18} /> 백업 내보내기
+            <button className="button ghost compactLabel" onClick={handleBackupExport} disabled={decks.length === 0}>
+              <Download size={18} /> <span data-short="내보내기">백업 내보내기</span>
             </button>
             <button className="button primary" onClick={handleCreateDeck}>
               <Plus size={18} /> 새 세트
             </button>
           </div>
+        </section>
+
+        <section className="quickStartGrid" aria-label="빠른 시작">
+          <button onClick={startSmartDue}>
+            <CalendarClock size={20} />
+            <span>오늘 복습 시작</span>
+            <small>{metrics.dueToday > 0 ? `${metrics.dueToday}개 대기` : "전체 학습으로 시작"}</small>
+          </button>
+          <button onClick={startLastDeck}>
+            <BookOpen size={20} />
+            <span>마지막 세트 이어하기</span>
+            <small>{activeDeck ? activeDeck.name : "새 세트 만들기"}</small>
+          </button>
+          <button onClick={startSmartWrong}>
+            <RotateCcw size={20} />
+            <span>오답만 학습</span>
+            <small>{metrics.weak > 0 ? `${metrics.weak}개 취약 문장` : "현재 세트 학습"}</small>
+          </button>
         </section>
 
         <section className="focusBoard">
@@ -797,6 +1067,23 @@ function App() {
         </section>
 
         <section className="dashboardGrid">
+          <div className="panel goalPanel">
+            <div className="panelHeader">
+              <div>
+                <h2>오늘 목표</h2>
+                <p>작게 쌓이는 학습 리듬을 추적합니다.</p>
+              </div>
+              <Target size={22} />
+            </div>
+            <div className="goalMeter">
+              <div><span style={{ width: `${Math.min(100, (learningStats.todayStudied / learningStats.dailyGoal) * 100)}%` }} /></div>
+              <strong>{learningStats.todayStudied} / {learningStats.dailyGoal}문장</strong>
+            </div>
+            <div className="goalStats">
+              <span><Flame size={16} /> {learningStats.streakDays}일 연속</span>
+              <span><CheckCircle2 size={16} /> 이번 주 {learningStats.weeklyAccuracy}%</span>
+            </div>
+          </div>
           <div className="panel reviewPanel">
             <div className="panelHeader">
               <div>
@@ -834,6 +1121,7 @@ function App() {
               <span>파일 선택</span>
               <small>.xlsx, .xls, .csv, .db</small>
             </button>
+            <ImportGuide />
           </div>
         </section>
 
@@ -893,6 +1181,10 @@ function App() {
           <Import size={18} />
           <span>가져오기</span>
         </button>
+        <button onClick={openMarketplace}>
+          <ShoppingBag size={18} />
+          <span>마켓</span>
+        </button>
         <button onClick={() => setView("settings")}>
           <Settings2 size={18} />
           <span>설정</span>
@@ -929,9 +1221,10 @@ function App() {
           <aside className="panel settingsPanel">
             <h2>학습 설정</h2>
             <label className="field">
-              <span>난이도 {difficulty}</span>
+              <span>{settings?.autoDifficulty ? "기준 난이도" : "난이도"} {difficulty}</span>
               <input type="range" min={1} max={5} value={difficulty} onChange={(event) => setDifficulty(Number(event.target.value))} />
             </label>
+            {settings?.autoDifficulty && <p className="settingsNote">문장 기록에 따라 실제 빈칸 난이도가 자동 조정됩니다.</p>}
             <div className="segmented three">
               <button className={studyMode === "ordered" ? "active" : ""} onClick={() => setStudyMode("ordered")}>순서</button>
               <button className={studyMode === "random" ? "active" : ""} onClick={() => setStudyMode("random")}>랜덤</button>
@@ -943,6 +1236,7 @@ function App() {
             <button className="button full ghost" onClick={() => fileInputRef.current?.click()}>
               <FileSpreadsheet size={18} /> 파일 더 가져오기
             </button>
+            <ImportGuide />
           </aside>
 
           <section className="panel editorPanel">
@@ -1087,7 +1381,7 @@ function App() {
             <span>{currentIndex + 1} / {prompts.length}</span>
             <div className="progressTrack"><div style={{ width: `${progress}%` }} /></div>
           </div>
-          <span className="difficultyBadge">난이도 {difficulty} · {blankModeLabels[settings?.blankMode ?? "random"]}</span>
+          <span className="difficultyBadge">난이도 {currentPrompt.difficulty} · {blankModeLabels[settings?.blankMode ?? "random"]}</span>
         </section>
         <section className="studyCard">
           <p className="translation">{currentPrompt.sentence.korean}</p>
@@ -1217,6 +1511,11 @@ function App() {
           </div>
           <div className="panel">
             <div className="panelHeader"><div><h2>학습 화면</h2><p>입력 흐름과 결과 확인 방식을 조절합니다.</p></div><Keyboard size={22} /></div>
+            <label className="field">
+              <span>하루 목표 문장 수</span>
+              <input className="textInput" type="number" min={1} max={300} value={settings.dailyGoal} onChange={(event) => saveSettings({ ...settings, dailyGoal: Math.max(1, Number(event.target.value) || 20) })} />
+            </label>
+            <label className="checkRow"><input type="checkbox" checked={settings.autoDifficulty} onChange={(event) => saveSettings({ ...settings, autoDifficulty: event.target.checked })} /><span>문장별 자동 난이도 추천</span></label>
             <label className="checkRow"><input type="checkbox" checked={settings.studyScreen.autoAdvanceCorrect} onChange={(event) => saveSettings({ ...settings, studyScreen: { ...settings.studyScreen, autoAdvanceCorrect: event.target.checked } })} /><span>정답이면 자동으로 다음 문장 이동</span></label>
             <label className="checkRow"><input type="checkbox" checked={settings.studyScreen.showHintButton} onChange={(event) => saveSettings({ ...settings, studyScreen: { ...settings.studyScreen, showHintButton: event.target.checked } })} /><span>힌트 버튼 표시</span></label>
             <label className="checkRow"><input type="checkbox" checked={settings.defaultExportIncludesHistory} onChange={(event) => saveSettings({ ...settings, defaultExportIncludesHistory: event.target.checked })} /><span>백업 내보내기에 학습 기록 포함</span></label>
@@ -1246,6 +1545,7 @@ function App() {
             </div>
             <button className="iconButton" onClick={() => setImportPreview(null)}><X size={20} /></button>
           </div>
+          <ImportGuide />
           <div className="previewTable">
             {importPreview.rows.slice(0, 12).map((row) => (
               <article className={row.valid ? "valid" : "invalid"} key={`${row.rowNumber}-${row.english}`}>
@@ -1264,6 +1564,87 @@ function App() {
     );
   }
 
+  function renderMarketplace() {
+    return (
+      <main className="shell marketplaceShell">
+        <section className="topbar">
+          <div>
+            <p className="eyebrow">Sentence Market</p>
+            <h1>다른 유저의 문장 세트를 가져오세요</h1>
+          </div>
+          <div className="topbarActions">
+            <button className="button ghost" onClick={openLanding}><Home size={18} /> 소개</button>
+            <button className="button ghost" onClick={openApp}><BookOpen size={18} /> 내 앱</button>
+            <button className="button primary" onClick={() => setMarketUploadOpen((open) => !open)}><Upload size={18} /> 내 덱 올리기</button>
+          </div>
+        </section>
+
+        {marketUploadOpen && (
+          <section className="panel marketUploadPanel">
+            <div className="panelHeader">
+              <div>
+                <h2>현재 선택한 덱 공개</h2>
+                <p>{activeDeck ? `"${activeDeck.name}" 세트를 즉시 공개합니다. 문장 수와 크기 제한을 통과해야 합니다.` : "먼저 앱에서 공개할 덱을 선택하세요."}</p>
+              </div>
+              <ShoppingBag size={22} />
+            </div>
+            <div className="marketUploadGrid">
+              <input className="textInput" placeholder="덱 이름" value={marketUpload.title} onChange={(event) => setMarketUpload((form) => ({ ...form, title: event.target.value }))} />
+              <input className="textInput" placeholder="제작자 표시명" value={marketUpload.authorName} onChange={(event) => setMarketUpload((form) => ({ ...form, authorName: event.target.value }))} />
+              <input className="textInput" placeholder="태그, 쉼표로 구분" value={marketUpload.tags} onChange={(event) => setMarketUpload((form) => ({ ...form, tags: event.target.value }))} />
+              <select className="textInput" value={marketUpload.icon} onChange={(event) => setMarketUpload((form) => ({ ...form, icon: event.target.value as DeckIcon }))}>
+                {deckIcons.map((icon) => <option value={icon} key={icon}>{icon}</option>)}
+              </select>
+              <textarea placeholder="덱 설명" value={marketUpload.description} onChange={(event) => setMarketUpload((form) => ({ ...form, description: event.target.value }))} />
+              <div className="colorSwatches large">
+                {deckColors.map((color) => (
+                  <button className={marketUpload.color === color ? "active" : ""} key={color} onClick={() => setMarketUpload((form) => ({ ...form, color }))} style={{ background: color }} />
+                ))}
+              </div>
+            </div>
+            <div className="formActions">
+              <button className="button ghost" onClick={() => setMarketUploadOpen(false)}>취소</button>
+              <button className="button primary" onClick={() => void uploadActiveDeckToMarketplace()} disabled={!activeDeck}>즉시 공개</button>
+            </div>
+          </section>
+        )}
+
+        <section className="marketHero panel">
+          <div>
+            <p className="eyebrow">Open Decks</p>
+            <h2>공유된 빈칸 학습 덱</h2>
+            <p>업로드된 덱은 즉시 공개됩니다. 부적절한 덱은 상세 화면에서 신고할 수 있습니다.</p>
+          </div>
+          <label className="searchBox">
+            <Search size={18} />
+            <input placeholder="덱, 제작자, 태그 검색" value={marketQuery} onChange={(event) => setMarketQuery(event.target.value)} />
+          </label>
+        </section>
+
+        <section className="marketGrid">
+          {filteredMarketDecks.map((deck) => {
+            const Icon = deckIconMap[deck.icon ?? "book"];
+            return (
+              <article className="marketCard" key={deck.id} style={{ "--deck-color": deck.color ?? deckColors[0] } as CSSProperties}>
+                <div className="deckCoverIcon"><Icon size={18} /></div>
+                <strong>{deck.title}</strong>
+                <p>{deck.description}</p>
+                <div className="marketMeta">
+                  <span>{deck.authorName}</span>
+                  <span>{deck.sentenceCount}문장</span>
+                </div>
+                <div className="tagList">{deck.tags.map((tag) => <small key={tag}>{tag}</small>)}</div>
+                <button className="button primary" onClick={() => void openMarketplaceDeck(deck.id)}>상세 보기</button>
+              </article>
+            );
+          })}
+          {filteredMarketDecks.length === 0 && <div className="tableEmpty">아직 표시할 공개 덱이 없습니다.</div>}
+        </section>
+        <SiteFooter />
+      </main>
+    );
+  }
+
   return (
     <>
       {busy && <div className="busyOverlay"><Loader2 className="spin" size={24} /> 처리 중</div>}
@@ -1276,8 +1657,71 @@ function App() {
       {view === "study" && renderStudy()}
       {view === "result" && renderResult()}
       {view === "settings" && renderSettings()}
+      {view === "marketplace" && renderMarketplace()}
       {renderImportPreview()}
+      {marketDetail && (
+        <div className="modalBackdrop">
+          <section className="modalCard marketDetail">
+            <div className="panelHeader">
+              <div>
+                <p className="eyebrow">Market Deck</p>
+                <h2>{marketDetail.summary.title}</h2>
+                <p>{marketDetail.summary.authorName} · {marketDetail.summary.sentenceCount}문장 · {formatDateTime(marketDetail.summary.createdAt)}</p>
+              </div>
+              <button className="iconButton" onClick={() => setMarketDetail(null)}><X size={20} /></button>
+            </div>
+            <p className="marketDescription">{marketDetail.summary.description}</p>
+            <div className="previewTable">
+              {marketDetail.sentences.slice(0, 5).map((sentence, index) => (
+                <article className="valid" key={`${sentence.english}-${index}`}>
+                  <strong>{sentence.english}</strong>
+                  <span>{sentence.korean}</span>
+                </article>
+              ))}
+            </div>
+            <div className="formActions">
+              <button className="button primary" onClick={() => void importMarketplaceDeck(marketDetail)}><Import size={18} /> 내 앱으로 가져오기</button>
+              <button className="button ghost" onClick={() => void exportMarketplaceDeck(marketDetail, "xlsx")}><FileSpreadsheet size={18} /> Excel 다운로드</button>
+              <button className="button ghost" onClick={() => void exportMarketplaceDeck(marketDetail, "json")}><Download size={18} /> JSON 다운로드</button>
+              <button className="button ghost dangerText" onClick={() => setMarketReport({ deckId: marketDetail.summary.id, reason: "부적절한 덱", detail: "" })}><Flag size={18} /> 신고</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {marketReport.deckId && (
+        <div className="modalBackdrop">
+          <section className="modalCard smallModal">
+            <div className="panelHeader">
+              <div>
+                <h2>덱 신고</h2>
+                <p>신고는 운영자가 Netlify 저장소에서 확인합니다.</p>
+              </div>
+              <button className="iconButton" onClick={() => setMarketReport({ deckId: "", reason: "", detail: "" })}><X size={20} /></button>
+            </div>
+            <input className="textInput" value={marketReport.reason} onChange={(event) => setMarketReport((form) => ({ ...form, reason: event.target.value }))} placeholder="신고 사유" />
+            <textarea value={marketReport.detail} onChange={(event) => setMarketReport((form) => ({ ...form, detail: event.target.value }))} placeholder="상세 내용" />
+            <div className="formActions">
+              <button className="button ghost" onClick={() => setMarketReport({ deckId: "", reason: "", detail: "" })}>취소</button>
+              <button className="button primary" onClick={() => void reportMarketplaceDeck()}>신고 접수</button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
+  );
+}
+
+function ImportGuide() {
+  return (
+    <div className="importGuide">
+      <strong>파일 형식 안내</strong>
+      <div className="guideTable" aria-label="가져오기 컬럼 예시">
+        <span>ID</span>
+        <span>English</span>
+        <span>Korean</span>
+      </div>
+      <p>첫 줄에 위 3개 컬럼을 두면 Excel/CSV를 바로 가져올 수 있습니다. 실제 샘플 데이터는 포함하지 않습니다.</p>
+    </div>
   );
 }
 

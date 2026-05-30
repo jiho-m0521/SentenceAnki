@@ -108,8 +108,13 @@ button:disabled {
   padding: 26px;
 }
 
+.sceneMetricRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .sceneMetric {
-  width: 154px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
@@ -119,7 +124,7 @@ button:disabled {
 }
 
 .sceneMetric strong {
-  font-size: 42px;
+  font-size: 34px;
 }
 
 .sceneMetric small,
@@ -389,7 +394,7 @@ button:disabled {
   box-shadow: 0 18px 54px rgba(22, 32, 51, 0.16);
   backdrop-filter: blur(22px) saturate(1.35);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 4px;
   padding: 8px;
 }
@@ -480,6 +485,7 @@ button:disabled {
   gap: 8px;
   padding: 0 14px;
   font-weight: 750;
+  white-space: nowrap;
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -557,9 +563,77 @@ button:disabled {
 
 .dashboardGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  grid-template-columns: minmax(230px, 0.75fr) minmax(0, 1.35fr) minmax(280px, 0.65fr);
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.quickStartGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.quickStartGrid button {
+  min-height: 104px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 7px;
+  padding: 16px;
+  text-align: left;
+}
+
+.quickStartGrid span {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.quickStartGrid small {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.goalPanel {
+  min-height: 248px;
+}
+
+.goalMeter {
+  display: grid;
+  gap: 10px;
+}
+
+.goalMeter div {
+  height: 10px;
+  border-radius: 999px;
+  background: #dfe6f1;
+  overflow: hidden;
+}
+
+.goalMeter span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.goalStats {
+  margin-top: 18px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.goalStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .reviewPanel {
@@ -623,6 +697,50 @@ button:disabled {
 .uploadBox small {
   color: var(--muted);
   font-weight: 650;
+}
+
+.importGuide {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.importGuide strong {
+  font-size: 13px;
+}
+
+.importGuide p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.guideTable {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.guideTable span {
+  min-height: 32px;
+  display: grid;
+  place-items: center;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.guideTable span:last-child {
+  border-right: 0;
 }
 
 .inlineHint {
@@ -696,7 +814,9 @@ button:disabled {
 .deckCard {
   position: relative;
   border: 1px solid var(--line);
-  background: #fff;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--deck-color, #2563eb) 12%, #fff), #fff 42%),
+    #fff;
   border-radius: 8px;
   padding: 16px;
   padding-right: 146px;
@@ -705,8 +825,18 @@ button:disabled {
 }
 
 .deckCard.active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
+  border-color: var(--deck-color, var(--primary));
+}
+
+.deckCoverIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--deck-color, var(--primary));
+  color: #fff;
+  margin-bottom: 10px;
 }
 
 .deckOpenButton {
@@ -760,6 +890,48 @@ button:disabled {
   right: 14px;
   display: flex;
   gap: 8px;
+}
+
+.deckAppearance {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.colorSwatches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.colorSwatches button {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  padding: 0;
+}
+
+.colorSwatches button.active {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.colorSwatches.large button {
+  width: 28px;
+  height: 28px;
+}
+
+.deckAppearance select {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .exportMenu {
@@ -859,6 +1031,13 @@ button:disabled {
   display: grid;
   gap: 10px;
   font-weight: 750;
+}
+
+.settingsNote {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 input[type="range"] {
@@ -1289,6 +1468,114 @@ input[type="range"] {
   color: var(--danger);
 }
 
+.marketplaceShell {
+  display: grid;
+  gap: 16px;
+}
+
+.marketHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.45fr);
+  gap: 18px;
+  align-items: end;
+}
+
+.marketHero h2,
+.marketHero p,
+.marketCard p {
+  margin: 0;
+}
+
+.marketHero h2 {
+  font-size: clamp(28px, 4vw, 46px);
+}
+
+.marketHero p,
+.marketDescription {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.marketGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.marketCard {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--deck-color, #2563eb) 12%, #fff), #fff 45%),
+    #fff;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.marketCard strong {
+  font-size: 18px;
+}
+
+.marketCard p {
+  min-height: 48px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.marketMeta,
+.tagList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tagList small {
+  border-radius: 999px;
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+}
+
+.marketUploadPanel {
+  border-color: var(--primary);
+}
+
+.marketUploadGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.marketUploadGrid textarea,
+.smallModal textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.marketUploadGrid textarea {
+  grid-column: 1 / -1;
+}
+
+.marketDetail {
+  display: grid;
+  gap: 12px;
+}
+
+.smallModal {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 12px;
+}
+
 .settingsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1529,7 +1816,10 @@ input[type="range"] {
   }
 
   .featureGrid,
-  .focusBoard {
+  .focusBoard,
+  .quickStartGrid,
+  .marketHero,
+  .marketUploadGrid {
     grid-template-columns: 1fr;
   }
 
@@ -1572,6 +1862,18 @@ input[type="range"] {
   .formActions .button,
   .resultActions .button {
     flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  .compactLabel span {
+    font-size: 0;
+  }
+
+  .compactLabel span::after {
+    content: attr(data-short);
+    font-size: 14px;
   }
 
   .deckTitleInput {
@@ -1580,7 +1882,7 @@ input[type="range"] {
 
   .deckCard {
     padding-right: 16px;
-    padding-bottom: 62px;
+    padding-bottom: 108px;
   }
 
   .deckIconActions {
@@ -1621,9 +1923,48 @@ input[type="range"] {
     bottom: 12px;
     min-height: 66px;
     border-radius: 24px;
+    width: min(520px, calc(100% - 16px));
+    gap: 2px;
+    padding: 6px;
   }
 
   .floatingTabBar button span {
-    font-size: 11px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .studyShell {
+    width: min(100% - 18px, 1000px);
+    min-height: 100svh;
+    padding: 10px 0 18px;
+  }
+
+  .studyHeader {
+    gap: 10px;
+  }
+
+  .studyCard {
+    border: 0;
+    box-shadow: none;
+    padding: 18px 0;
+  }
+
+  .translation {
+    margin-bottom: 24px;
+    font-size: 28px;
+    text-align: left;
+  }
+
+  .studyActions {
+    justify-content: flex-start;
+  }
+
+  .answerPanel div {
+    display: grid;
+  }
+
+  .landingActions .button {
+    flex: 1;
+    min-width: 0;
   }
 }

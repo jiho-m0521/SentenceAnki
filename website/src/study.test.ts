@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { compareAnswer, defaultSettings, diffAnswer, gradePrompt, makePrompt, nextReviewDate, orderSentences, updateReviewState } from "./study";
-import type { Sentence, StudyRecord } from "./types";
+import {
+  calculateLearningStats,
+  compareAnswer,
+  defaultSettings,
+  diffAnswer,
+  gradePrompt,
+  makePrompt,
+  nextReviewDate,
+  orderSentences,
+  recommendDifficulty,
+  updateReviewState,
+} from "./study";
+import type { ReviewState, Sentence, StudyRecord } from "./types";
 
 const baseSentence: Sentence = {
   id: "sentence_1",
@@ -86,5 +97,63 @@ describe("study prompt generation", () => {
 
   it("creates answer diff parts", () => {
     expect(diffAnswer("Italian Foo", "Italian Food").some((part) => part.type === "changed")).toBe(true);
+  });
+
+  it("recommends harder difficulty for weak sentences and easier difficulty for streaks", () => {
+    const weakReview: ReviewState = {
+      id: "review_1",
+      deckId: "deck_1",
+      sentenceId: "sentence_1",
+      attempts: 4,
+      correctAttempts: 2,
+      streak: 0,
+      srsLevel: 1,
+      nextReviewAt: "2026-01-01T00:00:00.000Z",
+      lastWrong: true,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const strongReview = { ...weakReview, lastWrong: false, attempts: 5, correctAttempts: 5, streak: 3 };
+    expect(recommendDifficulty(3, weakReview)).toBe(4);
+    expect(recommendDifficulty(3, strongReview)).toBe(2);
+    expect(recommendDifficulty(5, weakReview)).toBe(5);
+    expect(recommendDifficulty(3, undefined)).toBe(3);
+  });
+
+  it("calculates learning goal, streak, and weekly accuracy", () => {
+    const records: StudyRecord[] = [
+      {
+        id: "today",
+        deckId: "deck_1",
+        sentenceId: "sentence_1",
+        sessionId: "session_1",
+        answer: "A",
+        correctAnswer: "A",
+        isCorrect: true,
+        forcedCorrect: false,
+        difficulty: 3,
+        blankMode: "random",
+        responseMs: 1000,
+        studiedAt: "2026-06-02T01:00:00.000Z",
+      },
+      {
+        id: "yesterday",
+        deckId: "deck_1",
+        sentenceId: "sentence_2",
+        sessionId: "session_1",
+        answer: "B",
+        correctAnswer: "C",
+        isCorrect: false,
+        forcedCorrect: false,
+        difficulty: 3,
+        blankMode: "random",
+        responseMs: 1000,
+        studiedAt: "2026-06-01T01:00:00.000Z",
+      },
+    ];
+    const stats = calculateLearningStats(records, 20, new Date("2026-06-02T12:00:00.000Z"));
+    expect(stats.todayStudied).toBe(1);
+    expect(stats.streakDays).toBe(2);
+    expect(stats.weeklyAccuracy).toBe(50);
+    expect(stats.dailyGoal).toBe(20);
   });
 });
